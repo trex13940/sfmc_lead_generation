@@ -73,7 +73,7 @@ sequenceDiagram
 - **Marge de 60 jours** (au lieu de 70) : le client dispose d'au moins 10
   jours pour terminer le funnel avec un lead réutilisé.
 - **Repli** : en cas d'échec de création ou de token vide, redirection vers le
-  funnel sans pré-remplissage et trace dans `Lead_Error_Log`.
+  lien générique du funnel (`?partner=hesitating`, sans pré-remplissage) et trace dans `Lead_Error_Log`.
 
 ## Limites connues
 

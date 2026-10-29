@@ -14,7 +14,7 @@
    dans la BU).
    ===================================================================== */
 
-VAR @cfgFunnelUrl, @cfgMaxAgeDays, @cfgTokenField, @cfgServerUtcOffset
+VAR @cfgFunnelUrl, @cfgGenericParams, @cfgMaxAgeDays, @cfgTokenField, @cfgServerUtcOffset
 VAR @cfgDeContacts, @cfgDeLog, @cfgDeErrors, @cfgLeadSource
 VAR @state, @cle, @rows, @row, @cid, @prog, @dateFin, @go
 VAR @token, @leadId, @url, @fromCache, @created, @errorMsg
@@ -26,6 +26,7 @@ VAR @nom, @prenom, @email, @tel, @societe
    Configuration (à adapter par environnement)
    --------------------------------------------------------------------- */
 SET @cfgFunnelUrl       = "https://funnel.exemple.be/souscription"  /* URL du funnel */
+SET @cfgGenericParams   = "partner=hesitating"  /* paramètres du lien générique (lead non obtenu) */
 SET @cfgMaxAgeDays      = 60          /* marge : les leads SF sont valides 70 j */
 SET @cfgTokenField      = "Token__c"  /* champ du Lead qui porte le token funnel */
 SET @cfgServerUtcOffset = 6           /* Now() SFMC = CST (UTC-6, sans DST) */
@@ -156,7 +157,8 @@ IF @state == "process" THEN
   IF NOT EMPTY(@token) THEN
     SET @url = Concat(@cfgFunnelUrl, "?token=", URLEncode(@token))
   ELSE
-    SET @url = @cfgFunnelUrl
+    /* Lead non obtenu : lien générique du funnel, sans pré-remplissage */
+    SET @url = Concat(@cfgFunnelUrl, "?", @cfgGenericParams)
     InsertData(@cfgDeErrors,
                "CleOpaque",  @cle,
                "ContractId", @cid,
