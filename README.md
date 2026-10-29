@@ -74,6 +74,8 @@ sequenceDiagram
   jours pour terminer le funnel avec un lead réutilisé.
 - **Repli** : en cas d'échec de création ou de token vide, redirection vers le
   lien générique du funnel (`?partner=hesitating`, sans pré-remplissage) et trace dans `Lead_Error_Log`.
+  Une clé inconnue ou un programme terminé sont aussi redirigés vers ce lien
+  générique, sans trace d'erreur.
 
 ## Limites connues
 

@@ -63,6 +63,11 @@ IF NOT EMPTY(@cle) AND Length(@cle) == 36 THEN
   ENDIF
 ENDIF
 
+/* Clé inconnue ou programme terminé : lien générique du funnel */
+IF @state == "invalid" OR @state == "expired" THEN
+  Redirect(Concat(@cfgFunnelUrl, "?", @cfgGenericParams), false)
+ENDIF
+
 /* ---------------------------------------------------------------------
    2. Création / récupération du lead (uniquement après clic sur le bouton)
    --------------------------------------------------------------------- */
