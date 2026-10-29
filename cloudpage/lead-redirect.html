@@ -1,0 +1,204 @@
+%%[
+/* =====================================================================
+   CloudPage : génération du lead au clic puis redirection vers le funnel
+
+   Flux :
+   1. Le lien de l'email (CloudPagesURL) porte une clé opaque chiffrée (?qs=...)
+   2. GET  -> page de confirmation avec bouton (évite les leads créés par
+              les scanners de liens : Safe Links, Proofpoint, ...)
+   3. POST -> go=1 : recherche d'un lead valide (log DE, puis Service Cloud),
+              création si absent, redirection vers le funnel avec le token
+
+   Aucune donnée personnelle ne transite par l'URL.
+   Doit être publiée sur un domaine SFMC (Marketing Cloud Connect actif
+   dans la BU).
+   ===================================================================== */
+
+VAR @cfgFunnelUrl, @cfgMaxAgeDays, @cfgTokenField, @cfgServerUtcOffset
+VAR @cfgDeContacts, @cfgDeLog, @cfgDeErrors, @cfgLeadSource
+VAR @state, @cle, @rows, @row, @cid, @prog, @dateFin, @go
+VAR @token, @leadId, @url, @fromCache, @created, @errorMsg
+VAR @logRows, @logRow, @logDate
+VAR @cutoffD, @cutoff, @leads, @leadRow, @tr
+VAR @nom, @prenom, @email, @tel, @societe
+
+/* ---------------------------------------------------------------------
+   Configuration (à adapter par environnement)
+   --------------------------------------------------------------------- */
+SET @cfgFunnelUrl       = "https://funnel.exemple.be/souscription"  /* URL du funnel */
+SET @cfgMaxAgeDays      = 60          /* marge : les leads SF sont valides 70 j */
+SET @cfgTokenField      = "Token__c"  /* champ du Lead qui porte le token funnel */
+SET @cfgServerUtcOffset = 6           /* Now() SFMC = CST (UTC-6, sans DST) */
+SET @cfgLeadSource      = "Programme migration"
+SET @cfgDeContacts      = "Programme_Contacts"
+SET @cfgDeLog           = "Lead_Log"
+SET @cfgDeErrors        = "Lead_Error_Log"
+
+/* ---------------------------------------------------------------------
+   1. Validation de la clé et du programme
+   --------------------------------------------------------------------- */
+SET @state = "invalid"
+SET @errorMsg = ""
+SET @cle = Trim(RequestParameter("k"))
+
+IF NOT EMPTY(@cle) AND Length(@cle) == 36 THEN
+  SET @rows = LookupRows(@cfgDeContacts, "CleOpaque", @cle)
+
+  IF RowCount(@rows) == 1 THEN
+    SET @row     = Row(@rows, 1)
+    SET @dateFin = Field(@row, "DateFinProgramme")
+
+    /* Programme terminé (jour de fin inclus) */
+    IF NOT EMPTY(@dateFin) AND DateDiff(@dateFin, Now(), "D") > 0 THEN
+      SET @state = "expired"
+    ELSE
+      SET @go = RequestParameter("go")
+      IF @go == "1" THEN
+        SET @state = "process"
+      ELSE
+        SET @state = "confirm"
+      ENDIF
+    ENDIF
+  ENDIF
+ENDIF
+
+/* ---------------------------------------------------------------------
+   2. Création / récupération du lead (uniquement après clic sur le bouton)
+   --------------------------------------------------------------------- */
+IF @state == "process" THEN
+
+  SET @cid       = Field(@row, "ContractId")
+  SET @prog      = Field(@row, "ProgrammeRef")
+  SET @token     = ""
+  SET @leadId    = ""
+  SET @fromCache = false
+  SET @created   = false
+
+  /* 2a. Cache : DE de log (0 appel API Salesforce) */
+  SET @logRows = LookupRows(@cfgDeLog, "CleOpaque", @cle)
+  IF RowCount(@logRows) > 0 THEN
+    SET @logRow  = Row(@logRows, 1)
+    SET @logDate = Field(@logRow, "DateCreation")
+    IF NOT EMPTY(Field(@logRow, "Token")) AND NOT EMPTY(@logDate) THEN
+      IF DateDiff(@logDate, Now(), "D") < @cfgMaxAgeDays THEN
+        SET @token     = Field(@logRow, "Token")
+        SET @leadId    = Field(@logRow, "LeadId")
+        SET @fromCache = true
+      ENDIF
+    ENDIF
+  ENDIF
+
+  /* 2b. Lead existant et encore valide dans Service Cloud */
+  IF EMPTY(@token) THEN
+    /* CreatedDate est en UTC : on convertit l'heure serveur (CST) */
+    SET @cutoffD = DateAdd(DateAdd(Now(), @cfgServerUtcOffset, "H"), Multiply(@cfgMaxAgeDays, -1), "D")
+    SET @cutoff  = Concat(FormatDate(@cutoffD, "yyyy-MM-dd", "", "fr-BE"), "T", FormatDate(@cutoffD, "HH:mm:ss", "", "fr-BE"), "Z")
+
+    SET @leads = RetrieveSalesforceObjects("Lead", Concat("Id,", @cfgTokenField),
+                   "Contract_Ref__c",  "=", @cid,
+                   "Programme_Ref__c", "=", @prog,
+                   "CreatedDate",      ">", @cutoff)
+
+    IF RowCount(@leads) > 0 THEN
+      SET @leadRow = Row(@leads, 1)
+      SET @leadId  = Field(@leadRow, "Id")
+      SET @token   = Field(@leadRow, @cfgTokenField)
+    ENDIF
+  ENDIF
+
+  /* 2c. Création du lead si aucun lead valide */
+  IF EMPTY(@token) AND EMPTY(@leadId) THEN
+    SET @nom     = Field(@row, "Nom")
+    SET @prenom  = Field(@row, "Prenom")
+    SET @email   = Field(@row, "Email")
+    SET @tel     = Field(@row, "Telephone")
+    SET @societe = Field(@row, "Societe")
+    IF EMPTY(@societe) THEN SET @societe = "Particulier" ENDIF  /* Company est obligatoire sur Lead */
+
+    SET @leadId = CreateSalesforceObject("Lead", 9,
+                    "LastName",         @nom,
+                    "FirstName",        @prenom,
+                    "Email",            @email,
+                    "Phone",            @tel,
+                    "Company",          @societe,
+                    "LeadSource",       @cfgLeadSource,
+                    "Contract_Ref__c",  @cid,
+                    "Programme_Ref__c", @prog,
+                    "Description",      Concat("Créé au clic - clé ", @cle))
+
+    IF EMPTY(@leadId) OR @leadId == 0 THEN
+      SET @leadId   = ""
+      SET @errorMsg = "CreateSalesforceObject a échoué"
+    ELSE
+      SET @created = true
+    ENDIF
+  ENDIF
+
+  /* 2d. Le token est généré côté Salesforce : on le relit si nécessaire */
+  IF NOT EMPTY(@leadId) AND EMPTY(@token) THEN
+    SET @tr = RetrieveSalesforceObjects("Lead", @cfgTokenField, "Id", "=", @leadId)
+    IF RowCount(@tr) > 0 THEN
+      SET @token = Field(Row(@tr, 1), @cfgTokenField)
+    ENDIF
+    IF EMPTY(@token) THEN
+      SET @errorMsg = "Token vide après création/lecture du lead"
+    ELSEIF @created THEN
+      /* On ne logue que les leads créés ici : leur date de création est connue */
+      UpsertData(@cfgDeLog, 1,
+                 "CleOpaque",    @cle,
+                 "LeadId",       @leadId,
+                 "Token",        @token,
+                 "DateCreation", Now())
+    ENDIF
+  ENDIF
+
+  /* 2e. Redirection : funnel pré-rempli, ou repli sans pré-remplissage */
+  IF NOT EMPTY(@token) THEN
+    SET @url = Concat(@cfgFunnelUrl, "?token=", URLEncode(@token))
+  ELSE
+    SET @url = @cfgFunnelUrl
+    InsertData(@cfgDeErrors,
+               "CleOpaque",  @cle,
+               "ContractId", @cid,
+               "Message",    @errorMsg,
+               "DateErreur", Now())
+  ENDIF
+
+  Redirect(@url, false)
+ENDIF
+]%%
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Votre offre</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; background:#f4f5f7; margin:0; color:#222; }
+    .card { max-width:520px; margin:12vh auto; background:#fff; padding:32px; border-radius:8px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+    h1 { font-size:22px; margin-top:0; }
+    p { line-height:1.5; }
+    button { background:#0b5cff; color:#fff; border:0; padding:14px 28px; font-size:16px; border-radius:6px; cursor:pointer; }
+    button:hover { background:#0847c4; }
+  </style>
+</head>
+<body>
+  <div class="card">
+%%[ IF @state == "confirm" THEN ]%%
+    <h1>Bonjour %%=v(Field(@row, "Prenom"))=%%</h1>
+    <p>Votre offre personnalisée est prête. Cliquez ci-dessous pour poursuivre votre souscription : vos informations seront pré-remplies.</p>
+    <form method="post">
+      <input type="hidden" name="go" value="1">
+      <button type="submit">Accéder à mon offre</button>
+    </form>
+%%[ ELSEIF @state == "expired" THEN ]%%
+    <h1>Cette offre est terminée</h1>
+    <p>Le programme n'est plus ouvert à la souscription. Contactez-nous pour connaître les alternatives disponibles.</p>
+%%[ ELSE ]%%
+    <h1>Lien invalide</h1>
+    <p>Ce lien n'est pas valide. Veuillez utiliser le lien reçu par email ou nous contacter.</p>
+%%[ ENDIF ]%%
+  </div>
+</body>
+</html>

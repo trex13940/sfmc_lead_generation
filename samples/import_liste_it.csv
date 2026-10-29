@@ -1,0 +1,4 @@
+ContractId,ProgrammeRef,Email,Nom,Prenom,Telephone,Societe,DateFinProgramme,SubscriberKey
+800000000000001AAA,MIGR-2026-A,jean.dupont@example.com,Dupont,Jean,+3220000001,,2027-03-31,SK-0001
+800000000000002AAA,MIGR-2026-A,marie.martin@example.com,Martin,Marie,,Martin SPRL,2027-03-31,SK-0002
+800000000000003AAA,MIGR-2026-A,test.sans.tel@example.com,Test,Sans,,,2027-03-31,SK-0003

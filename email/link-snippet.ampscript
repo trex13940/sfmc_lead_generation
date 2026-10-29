@@ -1,0 +1,13 @@
+%%[
+/* Lien de l'email vers la CloudPage de génération du lead.
+   - CleOpaque : colonne de la DE d'envoi (GUID généré à l'import, voir sql/)
+   - 12345     : ID de la CloudPage "lead-redirect" (à remplacer)
+   CloudPagesURL chiffre le paramètre (?qs=...) : la clé n'est ni lisible
+   ni modifiable dans l'URL. */
+VAR @cle, @lien
+SET @cle  = AttributeValue("CleOpaque")
+SET @lien = CloudPagesURL(12345, "k", @cle)
+]%%
+
+<!-- RedirectTo() est obligatoire pour que le clic soit tracké -->
+<a href="%%=RedirectTo(@lien)=%%" alias="CTA_Programme_Migration">Accéder à mon offre</a>
