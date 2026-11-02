@@ -18,12 +18,19 @@ exécuté.
 | 10 | Révoquer le droit de création Lead à l'utilisateur MC Connect | Redirection vers `<funnel>?partner=hesitating` + `Lead_Error_Log` |
 | 11 | Deux clics simultanés (2 onglets) | Au plus 1 lead (sinon voir « Limites » du README) |
 | 12 | Lien de l'email (`CloudPagesURL`) modifié à la main | Redirection vers `<funnel>?partner=hesitating` |
+| 13 | Cliquer le bouton moins de 5 s après l'envoi (envoi test, clic immédiat) | Pas de lead, page de confirmation réaffichée, ligne « SUSPECT » dans `Lead_Error_Log` |
+| 14 | Même test avec `@cfgMinSeconds = 0` | Lead créé normalement |
+| 15 | Lien sans paramètre `t` (ancien lien, prévisualisation) | Aucun contrôle de délai, comportement normal |
 
 ## Points techniques à vérifier au premier test
 
 - Syntaxe `FormatDate(date, format, "", "fr-BE")` acceptée dans votre BU.
 - `RetrieveSalesforceObjects` avec trois filtres (AND) et filtre sur
   `CreatedDate` au format `yyyy-MM-ddTHH:mm:ssZ`.
+- `GetSendTime()` : valeur non vide sur un vrai envoi, au même fuseau que `Now()`
+  (le délai calculé doit être positif et plausible ; sinon ajuster).
+- Bloc SSJS (`Platform.Load`, regex) exécuté dans la CloudPage et variable
+  `@secsSinceSend` correctement renseignée.
 - Valeur retournée par `CreateSalesforceObject` en cas d'échec (vide ou 0 :
   les deux sont gérés).
 - `Redirect()` fonctionne bien avant tout contenu HTML sur la page.

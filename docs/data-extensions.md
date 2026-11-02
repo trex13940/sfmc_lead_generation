@@ -47,13 +47,18 @@ Sendable (SubscriberKey / Email) et utilisée comme DE d'envoi.
 Pas de rétention automatique : un lead expiré est ignoré via `DateCreation`,
 et la ligne est écrasée à la recréation.
 
-## `Lead_Error_Log` (erreurs de création)
+## `Analyse_Delais_Clic` et `Clics_Suspects` (reporting anti-bot)
+
+Alimentées par `sql/02_histogramme_delais_clic.sql` et
+`sql/03_clics_suspects.sql` (action Overwrite). Colonnes en tête des fichiers SQL.
+
+## `Lead_Error_Log` (erreurs de création et POST suspects)
 
 | Champ | Type | Remarque |
 |---|---|---|
 | CleOpaque | Text(36) | |
 | ContractId | Text(18) | |
-| Message | Text(500) | |
+| Message | Text(500) | erreur, ou « SUSPECT : POST n s après l'envoi » |
 | DateErreur | Date | |
 
 Sans clé primaire. Rétention conseillée : 30 jours. À surveiller par un

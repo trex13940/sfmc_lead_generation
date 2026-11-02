@@ -9,6 +9,10 @@
    3. POST -> go=1 : recherche d'un lead valide (log DE, puis Service Cloud),
               création si absent, redirection vers le funnel avec le token
 
+   Anti-bot supplémentaire : le lien porte l'heure d'envoi (paramètre t,
+   GetSendTime()). Un POST reçu moins de @cfgMinSeconds secondes après
+   l'envoi est ignoré (aucun lead) et tracé dans Lead_Error_Log.
+
    Aucune donnée personnelle ne transite par l'URL.
    Doit être publiée sur un domaine SFMC (Marketing Cloud Connect actif
    dans la BU).
@@ -21,6 +25,7 @@ VAR @token, @leadId, @url, @fromCache, @created, @errorMsg
 VAR @logRows, @logRow, @logDate
 VAR @cutoffD, @cutoff, @leads, @leadRow, @tr
 VAR @nom, @prenom, @email, @tel, @societe
+VAR @sendTs, @nowTs, @secsSinceSend, @cfgMinSeconds
 
 /* ---------------------------------------------------------------------
    Configuration (à adapter par environnement)
@@ -30,6 +35,7 @@ SET @cfgGenericParams   = "partner=hesitating"  /* paramètres du lien génériq
 SET @cfgMaxAgeDays      = 60          /* marge : les leads SF sont valides 70 j */
 SET @cfgTokenField      = "Token__c"  /* champ du Lead qui porte le token funnel */
 SET @cfgServerUtcOffset = 6           /* Now() SFMC = CST (UTC-6, sans DST) */
+SET @cfgMinSeconds      = 5           /* POST < 5 s après l'envoi = bot ; 0 = désactivé */
 SET @cfgLeadSource      = "Programme migration"
 SET @cfgDeContacts      = "Programme_Contacts"
 SET @cfgDeLog           = "Lead_Log"
@@ -66,6 +72,39 @@ ENDIF
 /* Clé inconnue ou programme terminé : lien générique du funnel */
 IF @state == "invalid" OR @state == "expired" THEN
   Redirect(Concat(@cfgFunnelUrl, "?", @cfgGenericParams), false)
+ENDIF
+
+/* ---------------------------------------------------------------------
+   1b. Anti-bot : secondes écoulées entre l'envoi (paramètre t) et maintenant.
+   DateDiff() AMPScript ne descend pas sous la minute : calcul en SSJS.
+   Les deux dates sont au format yyyy-MM-dd HH:mm:ss, heure serveur (CST).
+   Absent ou illisible : -1 (aucun contrôle).
+   Pas de saut de ligne entre les blocs : Redirect() doit précéder toute sortie.
+   --------------------------------------------------------------------- */
+SET @secsSinceSend = -1
+SET @sendTs = Trim(RequestParameter("t"))
+SET @nowTs  = FormatDate(Now(), "yyyy-MM-dd HH:mm:ss", "", "fr-BE")
+]%%<script runat="server">
+Platform.Load("core", "1.1.5");
+try {
+  var rx = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/;
+  var a = rx.exec(Variable.GetValue("@sendTs"));
+  var b = rx.exec(Variable.GetValue("@nowTs"));
+  if (a && b) {
+    var ta = Date.UTC(parseInt(a[1], 10), parseInt(a[2], 10) - 1, parseInt(a[3], 10), parseInt(a[4], 10), parseInt(a[5], 10), parseInt(a[6], 10));
+    var tb = Date.UTC(parseInt(b[1], 10), parseInt(b[2], 10) - 1, parseInt(b[3], 10), parseInt(b[4], 10), parseInt(b[5], 10), parseInt(b[6], 10));
+    Variable.SetValue("@secsSinceSend", Math.round((tb - ta) / 1000));
+  }
+} catch (e) {}
+</script>%%[
+/* POST trop rapide : pas de lead, on repasse sur la page de confirmation */
+IF @state == "process" AND @cfgMinSeconds > 0 AND @secsSinceSend >= 0 AND @secsSinceSend < @cfgMinSeconds THEN
+  InsertData(@cfgDeErrors,
+             "CleOpaque",  @cle,
+             "ContractId", Field(@row, "ContractId"),
+             "Message",    Concat("SUSPECT : POST ", @secsSinceSend, " s après l'envoi"),
+             "DateErreur", Now())
+  SET @state = "confirm"
 ENDIF
 
 /* ---------------------------------------------------------------------

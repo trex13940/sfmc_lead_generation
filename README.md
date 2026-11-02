@@ -39,6 +39,8 @@ sequenceDiagram
 | `cloudpage/lead-redirect.html` | CloudPage : validation de la clé, confirmation, création/réutilisation du lead, redirection |
 | `email/link-snippet.ampscript` | Construction du lien dans l'email |
 | `sql/01_generate_programme_contacts.sql` | Import des contacts et génération des clés opaques stables |
+| `sql/02_histogramme_delais_clic.sql` | Répartition des délais envoi → clic (choix du seuil anti-bot) |
+| `sql/03_clics_suspects.sql` | Clics < 5 s après l'envoi, à exclure des statistiques |
 | `docs/data-extensions.md` | Schéma des Data Extensions |
 | `docs/salesforce-checklist.md` | Points à valider avec l'admin Salesforce |
 | `tests/test-plan.md` | Plan de test |
@@ -67,6 +69,13 @@ sequenceDiagram
   doivent être fraîches : l'`Id` du contrat vient alors de la DE.
 - **Page de confirmation.** Les scanners de liens font des GET : ils
   n'atteignent jamais l'étape de création, seul le POST du bouton crée un lead.
+- **Anti-bot sur le délai d'envoi.** Le lien porte l'heure d'envoi du job
+  (`GetSendTime()`, paramètre `t` chiffré). Un POST reçu moins de
+  `@cfgMinSeconds` secondes après l'envoi (5 par défaut, 0 pour désactiver) ne
+  crée aucun lead et est tracé dans `Lead_Error_Log` (« SUSPECT »). Calcul en
+  SSJS car `DateDiff` AMPScript ne descend pas sous la minute. Les requêtes
+  `sql/02` et `sql/03` servent à calibrer le seuil et à nettoyer les
+  statistiques de clic.
 - **Anti-doublon en trois niveaux** : `Lead_Log` (0 appel API), puis
   `RetrieveSalesforceObjects` sur Lead (même contrat + même programme +
   créé depuis moins de 60 jours), puis création.
