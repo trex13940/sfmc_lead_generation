@@ -1,36 +1,35 @@
-# Plan de test (sandbox / BU de test)
+# Test plan (sandbox / test business unit)
 
-Prérequis : DE créées, CloudPage publiée, `@cfgFunnelUrl` pointant vers un
-funnel de recette, données de `samples/import_liste_it.csv` importées, SQL
-exécuté.
+Prerequisites: DEs created, CloudPage published, `@cfgFunnelUrl` pointing to a
+test funnel, data from `samples/import_liste_it.csv` imported, SQL executed.
 
-| # | Scénario | Attendu |
+| # | Scenario | Expected |
 |---|---|---|
-| 1 | Ouvrir la page sans `k` | Redirection vers `<funnel>?partner=hesitating`, aucun lead créé |
-| 2 | `k` inconnu (36 caractères au hasard) | Redirection vers `<funnel>?partner=hesitating` |
-| 3 | Clé valide, GET | Page de confirmation, **aucun lead créé** (simule un scanner) |
-| 4 | Clé valide, clic sur le bouton | Lead créé, ligne dans `Lead_Log`, redirection vers `…?token=<token>` |
-| 5 | Re-cliquer (même clé) | Même token, pas de nouveau lead, 0 appel Retrieve Lead (cache) |
-| 6 | Supprimer la ligne de `Lead_Log`, re-cliquer | Lead existant retrouvé via Retrieve, pas de doublon |
-| 7 | `DateCreation` ancienne (> 60 j) et lead SF > 60 j | Nouveau lead créé, `Lead_Log` mise à jour |
-| 8 | `DateFinProgramme` dans le passé | Redirection vers `<funnel>?partner=hesitating`, aucun lead créé |
-| 9 | Retirer `Token__c` du Lead (simuler token vide) | Redirection vers `<funnel>?partner=hesitating` (sans token), ligne dans `Lead_Error_Log` |
-| 10 | Révoquer le droit de création Lead à l'utilisateur MC Connect | Redirection vers `<funnel>?partner=hesitating` + `Lead_Error_Log` |
-| 11 | Deux clics simultanés (2 onglets) | Au plus 1 lead (sinon voir « Limites » du README) |
-| 12 | Lien de l'email (`CloudPagesURL`) modifié à la main | Redirection vers `<funnel>?partner=hesitating` |
-| 13 | Cliquer le bouton moins de 5 s après l'envoi (envoi test, clic immédiat) | Pas de lead, page de confirmation réaffichée, ligne « SUSPECT » dans `Lead_Error_Log` |
-| 14 | Même test avec `@cfgMinSeconds = 0` | Lead créé normalement |
-| 15 | Lien sans paramètre `t` (ancien lien, prévisualisation) | Aucun contrôle de délai, comportement normal |
+| 1 | Open the page without `k` | Redirect to `<funnel>?partner=hesitating`, no lead created |
+| 2 | Unknown `k` (36 random characters) | Redirect to `<funnel>?partner=hesitating` |
+| 3 | Valid key, GET | Confirmation page, **no lead created** (simulates a scanner) |
+| 4 | Valid key, click the button | Lead created, row in `Lead_Log`, redirect to `…?token=<token>` |
+| 5 | Click again (same key) | Same token, no new lead, 0 Lead Retrieve calls (cache) |
+| 6 | Delete the `Lead_Log` row, click again | Existing lead found via Retrieve, no duplicate |
+| 7 | Old `DateCreation` (> 60 days) and SF lead > 60 days | New lead created, `Lead_Log` updated |
+| 8 | `DateFinProgramme` in the past | Redirect to `<funnel>?partner=hesitating`, no lead created |
+| 9 | Remove `Token__c` from the Lead (simulate empty token) | Redirect to `<funnel>?partner=hesitating` (no token), row in `Lead_Error_Log` |
+| 10 | Revoke Lead create permission from the MC Connect user | Redirect to `<funnel>?partner=hesitating` + `Lead_Error_Log` |
+| 11 | Two simultaneous clicks (2 tabs) | At most 1 lead (otherwise see "Known limitations" in the README) |
+| 12 | Email link (`CloudPagesURL`) edited by hand | Redirect to `<funnel>?partner=hesitating` |
+| 13 | Click the button less than 5 s after the send (test send, immediate click) | No lead, confirmation page shown again, "SUSPECT" row in `Lead_Error_Log` |
+| 14 | Same test with `@cfgMinSeconds = 0` | Lead created normally |
+| 15 | Link without parameter `t` (old link, preview) | No delay check, normal behaviour |
 
-## Points techniques à vérifier au premier test
+## Technical points to verify on first test
 
-- Syntaxe `FormatDate(date, format, "", "fr-BE")` acceptée dans votre BU.
-- `RetrieveSalesforceObjects` avec trois filtres (AND) et filtre sur
-  `CreatedDate` au format `yyyy-MM-ddTHH:mm:ssZ`.
-- `GetSendTime()` : valeur non vide sur un vrai envoi, au même fuseau que `Now()`
-  (le délai calculé doit être positif et plausible ; sinon ajuster).
-- Bloc SSJS (`Platform.Load`, regex) exécuté dans la CloudPage et variable
-  `@secsSinceSend` correctement renseignée.
-- Valeur retournée par `CreateSalesforceObject` en cas d'échec (vide ou 0 :
-  les deux sont gérés).
-- `Redirect()` fonctionne bien avant tout contenu HTML sur la page.
+- `FormatDate(date, format, "", "fr-BE")` syntax accepted in your business unit.
+- `RetrieveSalesforceObjects` with three filters (AND) and a filter on
+  `CreatedDate` in the format `yyyy-MM-ddTHH:mm:ssZ`.
+- `GetSendTime()`: non-empty on a real send, same time zone as `Now()` (the
+  computed delay must be positive and plausible; otherwise adjust).
+- SSJS block (`Platform.Load`, regex) runs in the CloudPage and the variable
+  `@secsSinceSend` is correctly set.
+- Value returned by `CreateSalesforceObject` on failure (empty or 0: both are
+  handled).
+- `Redirect()` works before any HTML content on the page.

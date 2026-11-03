@@ -1,21 +1,21 @@
 %%[
 /* =====================================================================
-   CloudPage : génération du lead au clic puis redirection vers le funnel
+   CloudPage: create the lead on click, then redirect to the sales funnel
 
-   Flux :
-   1. Le lien de l'email (CloudPagesURL) porte une clé opaque chiffrée (?qs=...)
-   2. GET  -> page de confirmation avec bouton (évite les leads créés par
-              les scanners de liens : Safe Links, Proofpoint, ...)
-   3. POST -> go=1 : recherche d'un lead valide (log DE, puis Service Cloud),
-              création si absent, redirection vers le funnel avec le token
+   Flow:
+   1. The email link (CloudPagesURL) carries an encrypted opaque key (?qs=...)
+   2. GET  -> confirmation page with a button (prevents leads being created by
+              link scanners: Safe Links, Proofpoint, ...)
+   3. POST -> go=1: look for a valid lead (log DE, then Service Cloud),
+              create it if missing, redirect to the funnel with the token
 
-   Anti-bot supplémentaire : le lien porte l'heure d'envoi (paramètre t,
-   GetSendTime()). Un POST reçu moins de @cfgMinSeconds secondes après
-   l'envoi est ignoré (aucun lead) et tracé dans Lead_Error_Log.
+   Additional anti-bot check: the link carries the send time (parameter t,
+   GetSendTime()). A POST received less than @cfgMinSeconds seconds after
+   the send is ignored (no lead created) and logged in Lead_Error_Log.
 
-   Aucune donnée personnelle ne transite par l'URL.
-   Doit être publiée sur un domaine SFMC (Marketing Cloud Connect actif
-   dans la BU).
+   No personal data travels in the URL.
+   Must be published on an SFMC domain (Marketing Cloud Connect enabled
+   in the business unit).
    ===================================================================== */
 
 VAR @cfgFunnelUrl, @cfgGenericParams, @cfgMaxAgeDays, @cfgTokenField, @cfgServerUtcOffset
@@ -28,21 +28,21 @@ VAR @nom, @prenom, @email, @tel, @societe
 VAR @sendTs, @nowTs, @secsSinceSend, @cfgMinSeconds
 
 /* ---------------------------------------------------------------------
-   Configuration (à adapter par environnement)
+   Configuration (adapt per environment)
    --------------------------------------------------------------------- */
-SET @cfgFunnelUrl       = "https://funnel.exemple.be/souscription"  /* URL du funnel */
-SET @cfgGenericParams   = "partner=hesitating"  /* paramètres du lien générique (lead non obtenu) */
-SET @cfgMaxAgeDays      = 60          /* marge : les leads SF sont valides 70 j */
-SET @cfgTokenField      = "Token__c"  /* champ du Lead qui porte le token funnel */
-SET @cfgServerUtcOffset = 6           /* Now() SFMC = CST (UTC-6, sans DST) */
-SET @cfgMinSeconds      = 5           /* POST < 5 s après l'envoi = bot ; 0 = désactivé */
+SET @cfgFunnelUrl       = "https://funnel.exemple.be/souscription"  /* funnel URL */
+SET @cfgGenericParams   = "partner=hesitating"  /* query string of the generic link (no lead obtained) */
+SET @cfgMaxAgeDays      = 60          /* safety margin: SF leads are valid for 70 days */
+SET @cfgTokenField      = "Token__c"  /* Lead field holding the funnel token */
+SET @cfgServerUtcOffset = 6           /* SFMC Now() = CST (UTC-6, no DST) */
+SET @cfgMinSeconds      = 5           /* POST < 5 s after send = bot; 0 = disabled */
 SET @cfgLeadSource      = "Programme migration"
 SET @cfgDeContacts      = "Programme_Contacts"
 SET @cfgDeLog           = "Lead_Log"
 SET @cfgDeErrors        = "Lead_Error_Log"
 
 /* ---------------------------------------------------------------------
-   1. Validation de la clé et du programme
+   1. Validate the key and the program
    --------------------------------------------------------------------- */
 SET @state = "invalid"
 SET @errorMsg = ""
@@ -55,7 +55,7 @@ IF NOT EMPTY(@cle) AND Length(@cle) == 36 THEN
     SET @row     = Row(@rows, 1)
     SET @dateFin = Field(@row, "DateFinProgramme")
 
-    /* Programme terminé (jour de fin inclus) */
+    /* Program ended (end date included) */
     IF NOT EMPTY(@dateFin) AND DateDiff(@dateFin, Now(), "D") > 0 THEN
       SET @state = "expired"
     ELSE
@@ -69,17 +69,17 @@ IF NOT EMPTY(@cle) AND Length(@cle) == 36 THEN
   ENDIF
 ENDIF
 
-/* Clé inconnue ou programme terminé : lien générique du funnel */
+/* Unknown key or ended program: generic funnel link */
 IF @state == "invalid" OR @state == "expired" THEN
   Redirect(Concat(@cfgFunnelUrl, "?", @cfgGenericParams), false)
 ENDIF
 
 /* ---------------------------------------------------------------------
-   1b. Anti-bot : secondes écoulées entre l'envoi (paramètre t) et maintenant.
-   DateDiff() AMPScript ne descend pas sous la minute : calcul en SSJS.
-   Les deux dates sont au format yyyy-MM-dd HH:mm:ss, heure serveur (CST).
-   Absent ou illisible : -1 (aucun contrôle).
-   Pas de saut de ligne entre les blocs : Redirect() doit précéder toute sortie.
+   1b. Anti-bot: seconds elapsed between the send (parameter t) and now.
+   AMPscript DateDiff() cannot go below one minute: computed in SSJS.
+   Both dates use the format yyyy-MM-dd HH:mm:ss, server time (CST).
+   Missing or unreadable: -1 (no check).
+   No line break between the blocks: Redirect() must precede any output.
    --------------------------------------------------------------------- */
 SET @secsSinceSend = -1
 SET @sendTs = Trim(RequestParameter("t"))
@@ -97,18 +97,18 @@ try {
   }
 } catch (e) {}
 </script>%%[
-/* POST trop rapide : pas de lead, on repasse sur la page de confirmation */
+/* POST too fast: no lead, show the confirmation page again */
 IF @state == "process" AND @cfgMinSeconds > 0 AND @secsSinceSend >= 0 AND @secsSinceSend < @cfgMinSeconds THEN
   InsertData(@cfgDeErrors,
              "CleOpaque",  @cle,
              "ContractId", Field(@row, "ContractId"),
-             "Message",    Concat("SUSPECT : POST ", @secsSinceSend, " s après l'envoi"),
+             "Message",    Concat("SUSPECT: POST ", @secsSinceSend, " s after send"),
              "DateErreur", Now())
   SET @state = "confirm"
 ENDIF
 
 /* ---------------------------------------------------------------------
-   2. Création / récupération du lead (uniquement après clic sur le bouton)
+   2. Create / retrieve the lead (only after the button is clicked)
    --------------------------------------------------------------------- */
 IF @state == "process" THEN
 
@@ -119,7 +119,7 @@ IF @state == "process" THEN
   SET @fromCache = false
   SET @created   = false
 
-  /* 2a. Cache : DE de log (0 appel API Salesforce) */
+  /* 2a. Cache: log DE (0 Salesforce API calls) */
   SET @logRows = LookupRows(@cfgDeLog, "CleOpaque", @cle)
   IF RowCount(@logRows) > 0 THEN
     SET @logRow  = Row(@logRows, 1)
@@ -133,9 +133,9 @@ IF @state == "process" THEN
     ENDIF
   ENDIF
 
-  /* 2b. Lead existant et encore valide dans Service Cloud */
+  /* 2b. Existing, still valid lead in Service Cloud */
   IF EMPTY(@token) THEN
-    /* CreatedDate est en UTC : on convertit l'heure serveur (CST) */
+    /* CreatedDate is UTC: convert the server time (CST) */
     SET @cutoffD = DateAdd(DateAdd(Now(), @cfgServerUtcOffset, "H"), Multiply(@cfgMaxAgeDays, -1), "D")
     SET @cutoff  = Concat(FormatDate(@cutoffD, "yyyy-MM-dd", "", "fr-BE"), "T", FormatDate(@cutoffD, "HH:mm:ss", "", "fr-BE"), "Z")
 
@@ -151,14 +151,14 @@ IF @state == "process" THEN
     ENDIF
   ENDIF
 
-  /* 2c. Création du lead si aucun lead valide */
+  /* 2c. Create the lead if no valid lead exists */
   IF EMPTY(@token) AND EMPTY(@leadId) THEN
     SET @nom     = Field(@row, "Nom")
     SET @prenom  = Field(@row, "Prenom")
     SET @email   = Field(@row, "Email")
     SET @tel     = Field(@row, "Telephone")
     SET @societe = Field(@row, "Societe")
-    IF EMPTY(@societe) THEN SET @societe = "Particulier" ENDIF  /* Company est obligatoire sur Lead */
+    IF EMPTY(@societe) THEN SET @societe = "Particulier" ENDIF  /* Company is required on Lead */
 
     SET @leadId = CreateSalesforceObject("Lead", 9,
                     "LastName",         @nom,
@@ -173,22 +173,22 @@ IF @state == "process" THEN
 
     IF EMPTY(@leadId) OR @leadId == 0 THEN
       SET @leadId   = ""
-      SET @errorMsg = "CreateSalesforceObject a échoué"
+      SET @errorMsg = "CreateSalesforceObject failed"
     ELSE
       SET @created = true
     ENDIF
   ENDIF
 
-  /* 2d. Le token est généré côté Salesforce : on le relit si nécessaire */
+  /* 2d. The token is generated by Salesforce: read it back if needed */
   IF NOT EMPTY(@leadId) AND EMPTY(@token) THEN
     SET @tr = RetrieveSalesforceObjects("Lead", @cfgTokenField, "Id", "=", @leadId)
     IF RowCount(@tr) > 0 THEN
       SET @token = Field(Row(@tr, 1), @cfgTokenField)
     ENDIF
     IF EMPTY(@token) THEN
-      SET @errorMsg = "Token vide après création/lecture du lead"
+      SET @errorMsg = "Empty token after lead creation/read"
     ELSEIF @created THEN
-      /* On ne logue que les leads créés ici : leur date de création est connue */
+      /* Only log leads created here: their creation date is known */
       UpsertData(@cfgDeLog, 1,
                  "CleOpaque",    @cle,
                  "LeadId",       @leadId,
@@ -197,11 +197,11 @@ IF @state == "process" THEN
     ENDIF
   ENDIF
 
-  /* 2e. Redirection : funnel pré-rempli, ou repli sans pré-remplissage */
+  /* 2e. Redirect: pre-filled funnel, or fallback without pre-fill */
   IF NOT EMPTY(@token) THEN
     SET @url = Concat(@cfgFunnelUrl, "?token=", URLEncode(@token))
   ELSE
-    /* Lead non obtenu : lien générique du funnel, sans pré-remplissage */
+    /* No lead obtained: generic funnel link, no pre-fill */
     SET @url = Concat(@cfgFunnelUrl, "?", @cfgGenericParams)
     InsertData(@cfgDeErrors,
                "CleOpaque",  @cle,

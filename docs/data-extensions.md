@@ -1,29 +1,29 @@
 # Data Extensions
 
-## `Import_Liste_IT` (staging, Overwrite à chaque import)
+## `Import_Liste_IT` (staging, Overwrite on each import)
 
-Colonnes de la liste fournie par l'IT. Voir `samples/import_liste_it.csv`.
+Columns of the list provided by IT. See `samples/import_liste_it.csv`.
 
-| Champ | Type | Remarque |
+| Field | Type | Notes |
 |---|---|---|
-| ContractId | Text(18) | Id du contrat (Service Cloud) |
-| ProgrammeRef | Text(50) | Référence du programme / de la campagne |
+| ContractId | Text(18) | Contract Id (Service Cloud) |
+| ProgrammeRef | Text(50) | Program / campaign reference |
 | Email | EmailAddress | |
-| Nom | Text(80) | |
-| Prenom | Text(80) | |
+| Nom | Text(80) | Last name |
+| Prenom | Text(80) | First name |
 | Telephone | Text(40) | nullable |
-| Societe | Text(120) | nullable |
-| DateFinProgramme | Date | dernier jour de validité de l'offre |
+| Societe | Text(120) | Company, nullable |
+| DateFinProgramme | Date | last day the offer is valid |
 | SubscriberKey | Text(254) | |
 
-## `Programme_Contacts` (envoi + lookup de la CloudPage)
+## `Programme_Contacts` (sending DE + CloudPage lookup)
 
-Alimentée par `sql/01_generate_programme_contacts.sql` (action **Update**).
-Sendable (SubscriberKey / Email) et utilisée comme DE d'envoi.
+Populated by `sql/01_generate_programme_contacts.sql` (data action **Update**).
+Sendable (SubscriberKey / Email) and used as the sending DE.
 
-| Champ | Type | Clé | Remarque |
+| Field | Type | Key | Notes |
 |---|---|---|---|
-| CleOpaque | Text(36) | **PK** | GUID minuscule, utilisé dans le lien |
+| CleOpaque | Text(36) | **PK** | Lowercase GUID, used in the link |
 | ContractId | Text(18) | | |
 | ProgrammeRef | Text(50) | | |
 | Email | EmailAddress | | |
@@ -35,31 +35,32 @@ Sendable (SubscriberKey / Email) et utilisée comme DE d'envoi.
 | SubscriberKey | Text(254) | | |
 | ImportDate | Date | | |
 
-## `Lead_Log` (cache des leads créés par la CloudPage)
+## `Lead_Log` (cache of leads created by the CloudPage)
 
-| Champ | Type | Clé | Remarque |
+| Field | Type | Key | Notes |
 |---|---|---|---|
 | CleOpaque | Text(36) | **PK** | |
 | LeadId | Text(18) | | |
-| Token | Text(255) | | token funnel du lead |
-| DateCreation | Date | | `Now()` à la création |
+| Token | Text(255) | | lead's funnel token |
+| DateCreation | Date | | `Now()` at creation |
 
-Pas de rétention automatique : un lead expiré est ignoré via `DateCreation`,
-et la ligne est écrasée à la recréation.
+No automatic retention: an expired lead is ignored through `DateCreation`, and
+the row is overwritten when the lead is recreated.
 
-## `Analyse_Delais_Clic` et `Clics_Suspects` (reporting anti-bot)
+## `Analyse_Delais_Clic` and `Clics_Suspects` (anti-bot reporting)
 
-Alimentées par `sql/02_histogramme_delais_clic.sql` et
-`sql/03_clics_suspects.sql` (action Overwrite). Colonnes en tête des fichiers SQL.
+Populated by `sql/02_histogramme_delais_clic.sql` and
+`sql/03_clics_suspects.sql` (Overwrite). Columns are listed at the top of the
+SQL files.
 
-## `Lead_Error_Log` (erreurs de création et POST suspects)
+## `Lead_Error_Log` (creation errors and suspicious POSTs)
 
-| Champ | Type | Remarque |
+| Field | Type | Notes |
 |---|---|---|
 | CleOpaque | Text(36) | |
 | ContractId | Text(18) | |
-| Message | Text(500) | erreur, ou « SUSPECT : POST n s après l'envoi » |
+| Message | Text(500) | error, or "SUSPECT: POST n s after send" |
 | DateErreur | Date | |
 
-Sans clé primaire. Rétention conseillée : 30 jours. À surveiller par un
-rapport ou une alerte (Automation Studio / Verification Activity).
+No primary key. Suggested retention: 30 days. Monitor with a report or an alert
+(Automation Studio / Verification Activity).

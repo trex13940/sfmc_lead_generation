@@ -1,11 +1,11 @@
 /* Automation Studio - SQL Query Activity
-   Cible : Analyse_Delais_Clic, action "Overwrite"
-   (colonnes : Ordre int, Tranche varchar(20), NbClics int, NbAbonnes int)
+   Target: Analyse_Delais_Clic, data action "Overwrite"
+   (columns: Ordre int, Tranche varchar(20), NbClics int, NbAbonnes int)
 
-   Répartition des délais entre l'envoi (_Sent) et le clic (_Click) sur le lien
-   du programme. Sert à choisir @cfgMinSeconds : les bots forment un pic net
-   dans les premières tranches.
-   Adapter LinkName (alias du lien dans l'email) et la période. */
+   Distribution of the delay between the send (_Sent) and the click (_Click)
+   on the program link. Used to choose @cfgMinSeconds: bots form a clear peak
+   in the first buckets.
+   Adjust LinkName (alias of the link in the email) and the period. */
 
 SELECT
     d.Ordre,
@@ -26,7 +26,7 @@ FROM (
             ELSE 7
         END AS Ordre,
         CASE
-            WHEN DATEDIFF(second, s.EventDate, c.EventDate) < 0     THEN 'negatif'
+            WHEN DATEDIFF(second, s.EventDate, c.EventDate) < 0     THEN 'negative'
             WHEN DATEDIFF(second, s.EventDate, c.EventDate) < 5     THEN '0-4 s'
             WHEN DATEDIFF(second, s.EventDate, c.EventDate) < 10    THEN '5-9 s'
             WHEN DATEDIFF(second, s.EventDate, c.EventDate) < 30    THEN '10-29 s'

@@ -1,26 +1,26 @@
-# Checklist côté Salesforce (à valider avec l'admin)
+# Salesforce-side checklist (to validate with the admin)
 
-- [ ] **Marketing Cloud Connect** actif dans la BU qui héberge la CloudPage.
-- [ ] L'**utilisateur d'intégration MC Connect** peut créer des Leads et lire
-      Lead et Contrat (FLS sur tous les champs utilisés).
-- [ ] Champs personnalisés sur Lead :
-  - `Contract_Ref__c` (Text 18) : Id du contrat
-  - `Programme_Ref__c` (Text 50) : référence du programme
-  - `Token__c` : token utilisé par le funnel (le nom est configurable dans la
-    page : `@cfgTokenField`)
-- [ ] **Origine du token** : généré de façon synchrone à l'insertion (trigger
-      before/after insert, flow en temps réel ou champ formule). Un traitement
-      asynchrone rend le token vide juste après la création et déclenche le
-      repli sans pré-remplissage.
-- [ ] **Automatisations sur création de Lead** (règles d'assignation, flows,
-      notifications aux commerciaux) : vérifier qu'elles sont voulues, ou les
-      neutraliser pour `LeadSource = 'Programme migration'`.
-- [ ] `Company` est obligatoire : la page met « Particulier » quand `Societe`
-      est vide.
-- [ ] Impact sur les **quotas API** : 1 à 3 appels par clic « confirmé »,
-      0 pour les clics répétés grâce à `Lead_Log`.
-- [ ] Validité du lead : confirmer que les 70 jours se comptent depuis
-      `CreatedDate` (sinon adapter le filtre et `@cfgMaxAgeDays`).
-- [ ] Unicité : un External ID unique sur Lead empêcherait de recréer un lead
-      après expiration, sauf nettoyage du champ sur les leads expirés.
-      Le dédoublonnage repose donc sur `Lead_Log` + Retrieve.
+- [ ] **Marketing Cloud Connect** is enabled in the business unit hosting the
+      CloudPage.
+- [ ] The **MC Connect integration user** can create Leads and read Lead and
+      Contract (field-level security on every field used).
+- [ ] Custom fields on Lead:
+  - `Contract_Ref__c` (Text 18): contract Id
+  - `Programme_Ref__c` (Text 50): program reference
+  - `Token__c`: token used by the funnel (the name is configurable in the page:
+    `@cfgTokenField`)
+- [ ] **Token origin**: generated synchronously on insert (before/after insert
+      trigger, record-triggered flow or formula field). An asynchronous process
+      leaves the token empty right after creation and triggers the fallback
+      without pre-fill.
+- [ ] **Automations on Lead creation** (assignment rules, flows, notifications to
+      sales): check they are wanted, or bypass them for
+      `LeadSource = 'Programme migration'`.
+- [ ] `Company` is required: the page uses "Particulier" when `Societe` is empty.
+- [ ] Impact on **API quotas**: 1 to 3 calls per confirmed click, 0 for repeated
+      clicks thanks to `Lead_Log`.
+- [ ] Lead validity: confirm that the 70 days are counted from `CreatedDate`
+      (otherwise adapt the filter and `@cfgMaxAgeDays`).
+- [ ] Uniqueness: a unique External ID on Lead would prevent recreating a lead
+      after expiry, unless the field is cleared on expired leads.
+      Duplicate prevention therefore relies on `Lead_Log` + Retrieve.

@@ -1,11 +1,11 @@
 /* Automation Studio - SQL Query Activity
-   Cible : Clics_Suspects, action "Overwrite"
-   (colonnes : SubscriberKey varchar(254), JobID int, LinkName varchar(200),
+   Target: Clics_Suspects, data action "Overwrite"
+   (columns: SubscriberKey varchar(254), JobID int, LinkName varchar(200),
     DateClic datetime, DelaiSecondes int)
 
-   Clics faits moins de 5 secondes après l'envoi : à exclure des statistiques
-   de clic. Aligner le seuil sur @cfgMinSeconds de la CloudPage une fois
-   l'histogramme (02) analysé. */
+   Clicks made less than 5 seconds after the send: to be excluded from click
+   statistics. Align the threshold with @cfgMinSeconds in the CloudPage once
+   the histogram (02) has been analysed. */
 
 SELECT
     c.SubscriberKey,

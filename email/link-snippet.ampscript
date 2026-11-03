@@ -1,22 +1,22 @@
 %%[
-/* Lien de l'email vers la CloudPage de génération du lead.
-   - CleOpaque : colonne de la DE d'envoi (GUID généré à l'import, voir sql/)
-   - 12345     : ID de la CloudPage "lead-redirect" (à remplacer)
-   CloudPagesURL chiffre le paramètre (?qs=...) : la clé n'est ni lisible
-   ni modifiable dans l'URL.
-   - t : heure d'envoi du job (GetSendTime), utilisée par la CloudPage pour
-     ignorer les POST faits moins de quelques secondes après l'envoi (bots).
-     Format yyyy-MM-dd HH:mm:ss, identique à celui calculé dans la CloudPage. */
+/* Email link to the lead-generation CloudPage.
+   - CleOpaque : column of the sending DE (GUID generated at import, see sql/)
+   - 12345     : ID of the "lead-redirect" CloudPage (replace)
+   CloudPagesURL encrypts the parameters (?qs=...): the key is neither readable
+   nor modifiable in the URL.
+   - t : send time of the job (GetSendTime), used by the CloudPage to ignore
+     POSTs made within a few seconds of the send (bots).
+     Format yyyy-MM-dd HH:mm:ss, identical to the one computed in the CloudPage. */
 VAR @cle, @lien, @st, @sendTs
 SET @cle = AttributeValue("CleOpaque")
 SET @st  = GetSendTime()
 IF NOT EMPTY(@st) THEN
   SET @sendTs = FormatDate(@st, "yyyy-MM-dd HH:mm:ss", "", "fr-BE")
 ELSE
-  SET @sendTs = ""  /* prévisualisation : pas de contrôle de délai */
+  SET @sendTs = ""  /* preview: no delay check */
 ENDIF
 SET @lien = CloudPagesURL(12345, "k", @cle, "t", @sendTs)
 ]%%
 
-<!-- RedirectTo() est obligatoire pour que le clic soit tracké -->
+<!-- RedirectTo() is required for the click to be tracked -->
 <a href="%%=RedirectTo(@lien)=%%" alias="CTA_Programme_Migration">Accéder à mon offre</a>

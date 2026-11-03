@@ -1,9 +1,9 @@
 /* Automation Studio - SQL Query Activity
-   Source : Import_Liste_IT (liste fournie par l'IT)
-   Cible  : Programme_Contacts, action "Update" (ne jamais Overwrite)
+   Source: Import_Liste_IT (list provided by IT)
+   Target: Programme_Contacts, data action "Update" (never Overwrite)
 
-   La clé opaque existante est conservée à chaque réimport, de façon à ce que
-   les liens déjà envoyés restent valides pendant toute la durée du programme. */
+   The existing opaque key is kept on every re-import, so that links already
+   sent remain valid for the whole duration of the program. */
 
 SELECT
     COALESCE(p.CleOpaque, LOWER(CAST(NEWID() AS VARCHAR(36)))) AS CleOpaque,
